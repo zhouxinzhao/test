@@ -1,0 +1,108 @@
+#include <netinet/in.h> // for sockaddr_in6
+#include <sys/types.h> // for socket
+#include <sys/socket.h> // for socket
+#include <stdio.h> // for printf
+#include <stdlib.h> // for exit
+#include <string.h> // for bzero
+#include <time.h>
+
+#define BUFFER_SIZE 1024
+#define FILE_NAME_MAX_SIZE 512
+
+// 函数声明
+void handleError(const char* errorMessage);
+void initializeAddress(struct sockaddr_in6* addr, in_port_t port, const char* ipAddress);
+int createSocket();
+void bindSocket(int socket, struct sockaddr_in6* addr);
+void connectToServer(int socket, struct sockaddr_in6* addr, const char* serverIP);
+void transferFile(int socket, const char* fileName);
+
+int main(int argc, char** argv) {
+    if (argc != 2) {
+        printf("Usage: ./%s ServerIPAddress\n", argv[0]);
+        exit(1);
+    }
+
+    int clientSocket = createSocket();
+    struct sockaddr_in6 clientAddr, serverAddr;
+    initializeAddress(&clientAddr, htons(2000), in6addr_any);
+    bindSocket(clientSocket, &clientAddr);
+
+    initializeAddress(&serverAddr, htons(2000), argv[1]);
+    connectToServer(clientSocket, &serverAddr, argv[1]);
+
+    char fileName[FILE_NAME_MAX_SIZE + 1];
+    bzero(fileName, sizeof(fileName));
+    printf("Please Input File Name On Server: ");
+    scanf("%s", fileName);
+
+    printf("Start transmission? y or n\n");
+    char userDecision = getchar(); // 消除换行符的影响
+    userDecision = getchar();
+    if (userDecision == 'n') {
+        printf("File transfer canceled!\n");
+        exit(1);
+    } else {
+        transferFile(clientSocket, fileName);
+    }
+
+    close(clientSocket);
+    return 0;
+}
+
+void handleError(const char* errorMessage) {
+    printf("%s\n", errorMessage);
+    exit(1);
+}
+
+void initializeAddress(struct sockaddr_in6* addr, in_port_t port, const char* ipAddress) {
+    bzero(addr, sizeof(*addr));
+    addr->sin6_family = AF_INET6;
+    if (inet_pton(AF_INET6, ipAddress, &addr->sin6_addr) < 0) {
+        handleError("Address Initialization Failed!");
+    }
+    addr->sin6_port = port;
+}
+
+int createSocket() {
+    int socketFD = socket(AF_INET6, SOCK_STREAM, 0);
+    if (socketFD < 0) {
+        handleError("Create Socket Failed!");
+    }
+    return socketFD;
+}
+
+void bindSocket(int socket, struct sockaddr_in6* addr) {
+    if (bind(socket, (struct sockaddr*)addr, sizeof(*addr)) == -1) {
+        handleError("Client Bind Port Failed!");
+    }
+}
+
+void connectToServer(int socket, struct sockaddr_in6* addr, const char* serverIP) {
+    socklen_t addrLength = sizeof(*addr);
+    if (connect(socket, (struct sockaddr*)addr, addrLength) < 0) {
+        printf("Can Not Connect To %s!\n", serverIP);
+        exit(1);
+    }
+}
+
+void transferFile(int socket, const char* fileName) {
+    char buffer[BUFFER_SIZE];
+    bzero(buffer, sizeof(buffer));
+    strncpy(buffer, fileName, strlen(fileName) > BUFFER_SIZE ? BUFFER_SIZE : strlen(fileName));
+    send(socket, buffer, BUFFER_SIZE, 0);
+
+    FILE* fp = fopen(fileName, "w");
+    if (fp == NULL) {
+        printf("File:\t%s Can Not Open To Write!\n", fileName);
+        exit(1);
+    }
+
+    printf("Waiting for file transfer...\n");
+    int length = 0;
+    while ((length = recv(socket, buffer, sizeof(buffer), 0)) > 0) {
+        fwrite(buffer, sizeof(char), length, fp);
+    }
+
+    printf("Receive File: %s From Server Finished!\n", fileName);
+}

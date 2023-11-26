@@ -1,0 +1,118 @@
+#include <netinet/in.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/stat.h>
+
+#define LENGTH_OF_LISTEN_QUEUE 20
+#define BUFFER_SIZE 1024
+#define FILE_NAME_MAX_SIZE 512
+
+// 函数声明
+int initializeServerSocket(struct sockaddr_in6* addr, in_port_t port);
+void bindAndListen(int socket, const struct sockaddr_in6* addr);
+int acceptConnection(int server_socket, struct sockaddr_in6* client_addr);
+void handleFileTransfer(int client_socket, char* file_name);
+void sendFile(int socket, FILE* file, int speed);
+
+int main(int argc, char** argv) {
+    struct sockaddr_in6 server_addr;
+    int server_socket = initializeServerSocket(&server_addr, htons(2000));
+    bindAndListen(server_socket, &server_addr);
+
+    while (1) {
+        struct sockaddr_in6 client_addr;
+        int file_socket = acceptConnection(server_socket, &client_addr);
+        
+        char file_name[FILE_NAME_MAX_SIZE + 1];
+        bzero(file_name, sizeof(file_name));
+        recv(file_socket, file_name, FILE_NAME_MAX_SIZE, 0);
+        
+        printf("The file to be sent is: %s\n", file_name);
+        handleFileTransfer(file_socket, file_name);
+
+        close(file_socket);
+    }
+
+    close(server_socket);
+    return 0;
+}
+
+int initializeServerSocket(struct sockaddr_in6* addr, in_port_t port) {
+    bzero(addr, sizeof(*addr));
+    addr->sin6_family = AF_INET6;
+    addr->sin6_addr = in6addr_any;
+    addr->sin6_port = port;
+
+    int server_socket = socket(AF_INET6, SOCK_STREAM, 0);
+    if (server_socket < 0) {
+        perror("Create Socket Failed");
+        exit(1);
+    }
+    return server_socket;
+}
+
+void bindAndListen(int socket, const struct sockaddr_in6* addr) {
+    if (bind(socket, (struct sockaddr*) addr, sizeof(*addr)) == -1) {
+        perror("Server Bind Failed");
+        exit(1);
+    }
+
+    if (listen(socket, LENGTH_OF_LISTEN_QUEUE) == -1) {
+        perror("Server Listen Failed");
+        exit(1);
+    }
+}
+
+int acceptConnection(int server_socket, struct sockaddr_in6* client_addr) {
+    socklen_t length = sizeof(*client_addr);
+    int file_socket = accept(server_socket, (struct sockaddr*) client_addr, &length);
+    if (file_socket < 0) {
+        perror("Server Accept Failed");
+        exit(1);
+    }
+    return file_socket;
+}
+
+void handleFileTransfer(int client_socket, char* file_name) {
+    FILE* fp = fopen(file_name, "rb");
+    if (fp == NULL) {
+        printf("File:\t%s Not Found!\n", file_name);
+        return;
+    }
+
+    // 获取文件大小
+    struct stat file_stat;
+    stat(file_name, &file_stat);
+    int file_size = file_stat.st_size;
+    printf("File:\t%s is %d Byte.\n", file_name, file_size);
+
+    // 用户定义传输速度
+    int speed;
+    printf("Enter transmission speed in Byte/s (-1 for max speed): ");
+    scanf("%d", &speed);
+
+    // 发送文件
+    sendFile(client_socket, fp, speed == -1 ? 5000 : speed);
+
+    fclose(fp);
+    printf("File: %s Transfer Finished!\n", file_name);
+}
+
+void sendFile(int socket, FILE* file, int speed) {
+    char buffer[speed];
+    int file_block_length = 0;
+
+    while ((file_block_length = fread(buffer, sizeof(char), speed, file)) > 0) {
+        if (send(socket, buffer, file_block_length, 0) < 0) {
+            perror("Send File Failed");
+            break;
+        }
+        bzero(buffer, speed);
+        usleep(1000000 * (1 - speed / 2560));
+    }
+}
