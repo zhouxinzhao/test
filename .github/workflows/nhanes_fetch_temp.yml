@@ -32,6 +32,15 @@ jobs:
               'SLQ_I.xpt',
               'ALB_CR_I.xpt',
               'BMX_I.xpt',
+              'SMQ_I.xpt',
+              'COT_I.xpt',
+              'ALQ_I.xpt',
+              'PAQ_I.xpt',
+              'DR1TOT_I.xpt',
+              'BPQ_I.xpt',
+              'DIQ_I.xpt',
+              'DPQ_I.xpt',
+              'MCQ_I.xpt',
           ]
           bases = [
               'https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2015/DataFiles/',
@@ -70,7 +79,7 @@ jobs:
       - name: Upload raw official XPT files
         uses: actions/upload-artifact@v4
         with:
-          name: nhanes-2015-2016-raw
+          name: nhanes-2015-2016-raw-expanded
           path: nhanes_raw/
           if-no-files-found: error
           retention-days: 3
