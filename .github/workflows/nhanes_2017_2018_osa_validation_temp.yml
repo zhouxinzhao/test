@@ -22,7 +22,7 @@ jobs:
           python - <<'PY'
           import pathlib, time, urllib.request
           files = [
-              'DEMO_J.xpt','SLQ_J.xpt','PHTHTE_J.xpt','EPHPP_J.xpt',
+              'DEMO_J.xpt','SLQ_J.xpt','PHTHTE_J.xpt','EPHPP_J.xpt','FR_J.xpt',
               'ALB_CR_J.xpt','BMX_J.xpt','SMQ_J.xpt','ALQ_J.xpt',
               'BPQ_J.xpt','DIQ_J.xpt','MCQ_J.xpt'
           ]
@@ -60,7 +60,7 @@ jobs:
       - name: Upload official raw XPT files
         uses: actions/upload-artifact@v4
         with:
-          name: nhanes-2017-2018-osa-validation-raw
+          name: nhanes-2017-2018-osa-validation-raw-with-fr
           path: nhanes_2017_2018_raw/
           if-no-files-found: error
           retention-days: 3
